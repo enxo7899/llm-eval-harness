@@ -1,0 +1,16 @@
+{
+  "name": "llm-eval-harness",
+  "version": "1.0.0",
+  "description": "Regression-testing harness for LLM features: seeded bootstrap intervals, paired exact tests, a measured rubric judge and a ship/block gate. Runs in Node and the browser with no dependencies.",
+  "type": "module",
+  "license": "MIT",
+  "author": "EmSoft",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "eval": "node scripts/gate.mjs",
+    "gate:ci": "node scripts/gate.mjs --base v1 --candidate v2",
+    "evaluate": "node scripts/evaluate.mjs",
+    "dev": "python3 -m http.server 5185 --bind 127.0.0.1",
+    "screenshots": "node scripts/screenshots.mjs"
+  }
+}

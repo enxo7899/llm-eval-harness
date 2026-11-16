@@ -1,0 +1,18 @@
+{
+  "seed": 20261116,
+  "bootstrapIterations": 2000,
+  "shipped": "v2",
+  "previous": "v1",
+  "gate": {
+    "minTestSize": 100,
+    "minSliceSize": 8,
+    "maxSliceDropPoints": 3,
+    "requireSliceSignificance": false,
+    "minAdversarialAccuracy": 0.45,
+    "maxOverallDropPoints": 1,
+    "alpha": 0.05,
+    "minJudgePassRate": 0.65,
+    "maxUrgencyEce": 0.25
+  },
+  "flakiness": { "runs": 10, "temperature": 0.3 }
+}

@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM eval harness: regression report</title>
+<meta name="description" content="Did a prompt or model change make the assistant better or worse? Seeded confidence intervals, a paired exact test, a measured judge and a ship/block gate, running live in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#f5f0e6;--paper2:#ece5d6;--ink:#1c1a17;--muted:#6a6459;--rule:#cdc4b1;--accent:#b23a1b;--accent-tint:rgba(178,58,27,.11);--ink-tint:rgba(28,26,23,.09);
+--serif:"Crimson Pro",Georgia,"Times New Roman",serif;--mono:"Geist Mono",ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:19px/1.5 var(--serif);overflow-x:hidden}
+a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:3px}
+.banner{background:var(--ink);color:var(--paper);font:13px/1.45 var(--mono);padding:9px 16px;text-align:center}
+.banner a{color:var(--paper)}
+main{max-width:980px;margin:0 auto;padding:28px 16px 72px}
+.kicker{font:500 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+h1{font:600 clamp(30px,5.4vw,46px)/1.08 var(--serif);margin:0 0 14px;letter-spacing:-.01em;max-width:18em}
+.lede{max-width:40em;margin:0 0 6px;color:#38342d}
+.meta{font:12.5px/1.5 var(--mono);color:var(--muted);margin:10px 0 0}
+h2{font:600 24px/1.2 var(--serif);margin:0 0 4px}
+h2 .no{font:500 12px var(--mono);color:var(--muted);letter-spacing:.06em;margin-right:10px;vertical-align:3px}
+section{border-top:1.5px solid var(--ink);padding:18px 0 8px;margin-top:34px}
+section>p.note{margin:2px 0 14px;color:#4a453c;max-width:46em}
+.controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;border-top:1.5px solid var(--ink);border-bottom:1px solid var(--rule);padding:12px 0;margin-top:26px;font:15px var(--mono)}
+.controls label{display:flex;gap:8px;align-items:center}
+select,input[type=range]{font:inherit}
+select{font:15px var(--mono);background:var(--paper2);color:var(--ink);border:1px solid var(--ink);padding:5px 8px;border-radius:0}
+.arrow{color:var(--muted)}
+.verdict{padding:18px 0 6px}
+.verdict .v{font:600 clamp(26px,4.6vw,38px)/1.15 var(--serif);margin:0}
+.verdict .v.blocked{color:var(--accent)}
+.verdict .v.undecided{color:var(--ink);font-style:italic}
+.verdict .tag{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+th,td{padding:6px 10px 6px 0;text-align:left;vertical-align:baseline;border-bottom:1px solid var(--rule)}
+th{font:500 11.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1.5px solid var(--ink);white-space:nowrap}
+td.n,th.n{text-align:right;font-family:var(--mono);font-size:14px;white-space:nowrap}
+td.m{font-family:var(--mono);font-size:14px}
+tr.fail td{color:var(--accent)}
+tr.fail td.k{font-weight:500}
+.rules td.k{font:500 12px var(--mono);width:64px;letter-spacing:.06em}
+.rules tr.skip td{color:var(--muted)}
+.ci{color:var(--muted);font-size:12.5px}
+.delta.neg{color:var(--accent)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:26px}.grid2>*{min-width:0}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}body{font-size:18px}}
+.break{border:1.5px solid var(--ink);background:var(--paper2);padding:14px 16px 12px;margin-top:22px}
+.break h3{font:600 18px var(--serif);margin:0 0 2px}
+.break p{margin:0 0 10px;font-size:16px;color:#4a453c}
+.break .row{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;font:14px var(--mono)}
+.break input[type=range]{width:min(320px,70vw);accent-color:var(--accent)}
+.break output{font-weight:500}
+.break .readout{margin-top:10px;font:13.5px/1.5 var(--mono);color:#38342d}
+.toggle{display:flex;gap:8px;align-items:center;cursor:pointer}
+.toggle input{accent-color:var(--accent);width:17px;height:17px}
+button{font:14px var(--mono);background:var(--ink);color:var(--paper);border:0;padding:6px 12px;cursor:pointer;border-radius:0}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.cm td,.cm th{text-align:center;padding:5px 4px;font:12.5px var(--mono);border:1px solid var(--rule)}
+.cm th{background:transparent;border-bottom:1px solid var(--rule)}
+.cm th.rowh{text-align:right;padding-right:8px;white-space:nowrap}
+.cm td.diag{background:var(--ink-tint)}
+.cm td.err{background:var(--accent-tint);color:var(--accent);font-weight:500}
+.f1bar{display:inline-block;height:6px;background:var(--ink);vertical-align:middle;margin-left:6px}
+.kappa{font:600 40px/1 var(--serif)}
+.kappa.low{color:var(--accent)}
+.stat{display:flex;gap:28px;flex-wrap:wrap;align-items:baseline;margin:6px 0 10px}
+.stat div span{display:block;font:11.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cases{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:26px}
+@media(max-width:860px){.cases{grid-template-columns:1fr}}
+.list{max-height:420px;overflow:auto;border-top:1.5px solid var(--ink);border-bottom:1px solid var(--rule)}
+.list button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:62px 1fr;gap:8px;width:100%;padding:7px 4px;border-bottom:1px solid var(--rule);cursor:pointer;font-size:16px;line-height:1.35}
+.list button:hover,.list button[aria-current=true]{background:var(--paper2)}
+.list button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.list .id{font:12.5px var(--mono);color:var(--muted);padding-top:3px}
+.list .t{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.list .reg{color:var(--accent)}
+.empty{border:1px dashed var(--muted);padding:18px;color:var(--muted);font-size:17px}
+.detail{border-top:1.5px solid var(--ink);padding-top:10px}
+.detail blockquote{margin:6px 0 12px;padding:0 0 0 12px;border-left:3px solid var(--rule);font-size:19px}
+.tagline{font:12.5px/1.6 var(--mono);color:var(--muted)}
+.out{border-top:1px solid var(--rule);padding:10px 0}
+.out h4{font:500 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px}
+.out.bad h4,.out.bad .verd{color:var(--accent)}
+.out .reply{font-size:16.5px;margin:6px 0;color:#2d2a25}
+.out .judge{font:12.5px/1.5 var(--mono);color:var(--muted)}
+.out .verd{font:500 13px var(--mono)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.filters button{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.filters button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.dis{font-size:16px}
+.dis td{vertical-align:top}
+footer{margin-top:48px;border-top:1.5px solid var(--ink);padding-top:14px;font-size:16px;color:#4a453c}
+footer code,.mono{font:13.5px var(--mono)}
+svg text{font-family:var(--mono)}
+@media(max-width:520px){th,td{padding-right:7px}.kappa{font-size:34px}.controls{font-size:14px}}
+</style>
+</head>
+<body>
+<div class="banner">Live demo by EmSoft. Arka Bank is a fictional retail bank. Versions v1, v2 and v3 are deterministic stand-ins for model versions, not real models. <a href="https://github.com/enxo7899/llm-eval-harness">Source</a></div>
+<main>
+  <p class="kicker">Regression report · Arka Bank support triage</p>
+  <h1>Did the change make the assistant better or worse?</h1>
+  <p class="lede">Pick two versions. The harness scores both on the same labelled cases, puts error bars on every number, tests the difference, and says ship or block. Everything below is computed in your browser by the code in <span class="mono">src/</span>.</p>
+  <p class="meta" id="meta">Loading the test set…</p>
+
+  <div class="controls" id="controls">
+    <label>Base <select id="base" aria-label="Base version"></select></label>
+    <span class="arrow">against</span>
+    <label>Candidate <select id="cand" aria-label="Candidate version"></select></label>
+    <span class="mono" style="color:var(--muted)" id="vdesc"></span>
+  </div>
+
+  <div id="top">
+  <div class="verdict" id="verdict" aria-live="polite"></div>
+  <div class="wrap"><table class="rules" id="rules"></table></div>
+
+  <div class="break" id="break">
+    <h3>Try to break it</h3>
+    <p>Throw away test cases and watch the error bars widen until the gate refuses to decide. Or let the judge go easy and watch its agreement with people collapse.</p>
+    <div class="row">
+      <label>Cases kept <input type="range" id="keep" min="20" max="183" step="1" value="183" aria-label="Number of test cases kept"> <output id="keepOut"></output></label>
+      <label class="toggle"><input type="checkbox" id="lenient"> Judge goes lenient</label>
+      <button class="ghost" id="reset" type="button">Reset</button>
+    </div>
+    <div class="readout" id="readout"></div>
+  </div>
+  </div>
+
+  <section id="s1"><h2><span class="no">1</span>Headline metrics</h2>
+    <p class="note">Intent is one of seven labels. Each bar is a 95% bootstrap interval (2,000 resamples, fixed seed): if two bars overlap a lot, the difference may be noise.</p>
+    <div class="wrap"><table id="metrics"></table></div>
+  </section>
+
+  <section id="s2"><h2><span class="no">2</span>Is the difference real?</h2>
+    <p class="note" id="pairedText"></p>
+    <div class="grid2"><div class="wrap"><table id="mc"></table></div><div id="mcSide"></div></div>
+  </section>
+
+  <section id="s3"><h2><span class="no">3</span>Slices</h2>
+    <p class="note">An average can hide a group that got worse. A slice is flagged when it drops by more than the gate allows. Slices overlap: an Albanian email counts in both rows.</p>
+    <div class="wrap"><table id="slices"></table></div>
+  </section>
+
+  <section id="s4"><h2><span class="no">4</span>Where the errors go</h2>
+    <p class="note">Rows are the true intent, columns what the version said. Off-diagonal cells in colour are mistakes.</p>
+    <div class="grid2" id="cmGrid"></div>
+  </section>
+
+  <section id="s5"><h2><span class="no">5</span>Urgency calibration</h2>
+    <p class="note">When a version says it is 90% sure of an urgency, it should be right about 90% of the time. The gap, averaged over cases, is the expected calibration error.</p>
+    <div class="grid2" id="calGrid"></div>
+  </section>
+
+  <section id="s6"><h2><span class="no">6</span>The judge, measured against people</h2>
+    <p class="note">A rule-based judge scores every drafted reply. A judge is an instrument, so it is checked against replies that a person rated (written for this demo, 4 or 5 out of 5 means acceptable). Kappa is agreement beyond chance.</p>
+    <div id="judge"></div>
+  </section>
+
+  <section id="s7"><h2><span class="no">7</span>Flaky cases</h2>
+    <p class="note">A deterministic stand-in never changes its mind, so seeded sampling noise is added to its scores to mimic a model run at a temperature above zero. Run the candidate ten times: cases that do not give the same answer every time are the ones a single run cannot be trusted on.</p>
+    <div class="row" style="display:flex;gap:14px;align-items:center;font:14px var(--mono);margin-bottom:10px"><label>Noise <input type="range" id="temp" min="0" max="0.6" step="0.05" value="0.3" aria-label="Sampling noise"> <output id="tempOut"></output></label></div>
+    <div id="flaky"></div>
+  </section>
+
+  <section id="s8"><h2><span class="no">8</span>Case inspector</h2>
+    <p class="note">Click a case to see the message, the gold labels, both outputs and the judge's reasons.</p>
+    <div class="filters" id="filters"></div>
+    <div class="cases"><div class="list" id="list" role="list"></div><div id="detail"></div></div>
+  </section>
+
+  <footer>
+    <p>Method: the core in <span class="mono">src/</span> is plain ES modules that this page imports unchanged; the same code runs <span class="mono">npm test</span>, the command-line gate and CI. The candidates are hand-written rule sets standing in for model versions, and the human ratings were written for the demo, so none of these numbers say anything about a real model. Recorded runs: <a href="docs/results.json">docs/results.json</a>.</p>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
